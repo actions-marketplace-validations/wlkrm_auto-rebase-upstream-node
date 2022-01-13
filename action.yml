@@ -1,0 +1,80 @@
+name: Auto Rebase Upstream Node
+description: Use git rebase to sync with upstream
+author: wlkrm
+branding:
+  icon: git-pull-request
+  color: green
+
+inputs:
+  upstream:
+    description: HTTP URL of upstream repo
+    required: false
+  branch:
+    description: The upstream branch that is rebased on
+    required: false
+    default:  main
+  depth:
+    description: Greater than the number of commits the upstream made in a period
+    required: false
+    default:  '100'
+  push:
+    description: Do the force push in this action
+    required: false
+    default:  'true'
+  nodetoken:
+    description: Node auth token for private registry
+    required: false
+    default:  'none'
+  nodescope:
+    description: Node scope for private registry
+    required: false
+    default:  'none'
+  nodeurl:
+    description: Node url for private registry
+    required: false
+    default:  'none'
+  nodev:
+    description: Node version
+    required: false
+    default:  '16.x'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v2.4.0
+      with:
+        fetch-depth: ${{ inputs.depth }}
+    - name: Start rebase upstream
+      shell: bash
+      run: |
+        UPSTREAM=${{ inputs.upstream }};
+        DEPTH=${{ inputs.depth }};
+        git remote add upstream $UPSTREAM;
+        git fetch upstream ${{ inputs.branch }} $DEPTH;
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com";
+        git config --local user.name  "GitHub Actions";
+        git rebase upstream/${{ inputs.branch }};
+    - name: Setup npm
+      uses: actions/setup-node@v2.4.0
+      with:
+        node-version: ${{ inputs.nodev }}
+        registry-url: ${{ inputs.nodeurl }}
+        scope: ${{ inputs.nodescope }}
+    - name: Npm install
+      run: npm install
+      env: 
+        NODE_AUTH_TOKEN: ${{ inputs.nodetoken }}
+      shell: bash
+    - name: Continue rebase upstream
+      run: |
+        set -ex;
+        git add package-lock.json;
+        git rebase --continue;
+      shell: bash
+    - name: Git push
+      run: |    
+        if [ "${{ inputs.push }}" = "true" -a "$(git status | grep diverged)" ]; then
+            git push origin $(git branch --show-current) --force-with-lease;
+        fi;
+      shell: bash
