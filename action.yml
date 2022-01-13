@@ -13,6 +13,14 @@ inputs:
     description: The upstream branch that is rebased on
     required: false
     default:  main
+  repo:
+    description: e.g. github.repository
+    default: placeholder
+    required: false
+  repotoken:
+    description: e.g. secrets.GITHUB_TOKEN
+    default: placeholder
+    required: false
   depth:
     description: Greater than the number of commits the upstream made in a period
     required: false
@@ -45,16 +53,17 @@ runs:
       uses: actions/checkout@v2.4.0
       with:
         fetch-depth: ${{ inputs.depth }}
+        token: ${{ inputs.repotoken }}
     - name: Start rebase upstream
       shell: bash
       run: |
         UPSTREAM=${{ inputs.upstream }};
         DEPTH=${{ inputs.depth }};
         git remote add upstream $UPSTREAM;
-        git fetch upstream ${{ inputs.branch }} $DEPTH;
+        git fetch upstream ${{ inputs.branch }} --depth=$DEPTH;
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com";
         git config --local user.name  "GitHub Actions";
-        git rebase upstream/${{ inputs.branch }};
+        git rebase upstream/${{ inputs.branch }} || true;
     - name: Setup npm
       uses: actions/setup-node@v2.4.0
       with:
@@ -70,10 +79,11 @@ runs:
       run: |
         set -ex;
         git add package-lock.json;
-        git rebase --continue;
+        git -c core.editor=true rebase --continue;
       shell: bash
     - name: Git push
-      run: |    
+      run: |
+        echo "Force pushing to ${{ inputs.repo }}";
         if [ "${{ inputs.push }}" = "true" -a "$(git status | grep diverged)" ]; then
             git push origin $(git branch --show-current) --force-with-lease;
         fi;
